@@ -1,0 +1,1217 @@
+import React, { useState } from "react";
+
+export default function App() {
+  // Stato per il ruolo dell'utente: "fitness_lover" o "personal_trainer"
+  const [role, setRole] = useState("fitness_lover");
+  // Stato per il tipo di sessione selezionata: "exclusive" (per Fitness Lover), "nutrition", "personal_training" (per Personal Trainer)
+  const [type, setType] = useState("");
+  // Stato per il numero di persone (solo per Fitness Lover Exclusive)
+  const [people, setPeople] = useState("");
+  // Stato per la modalità di allenamento (solo per Personal Trainer - Personal Training)
+  const [trainerMode, setTrainerMode] = useState("");
+  // Stato per il programma nutrizionale (per entrambi i ruoli se si sceglie "nutrition")
+  const [nutritionalProgram, setNutritionalProgram] = useState("");
+
+  // Stati specifici per il form di Consulenza Nutrizionale
+  const [nutritionalName, setNutritionalName] = useState("");
+  const [nutritionalSurname, setNutritionalSurname] = useState("");
+  const [nutritionalAge, setNutritionalAge] = useState("");
+  const [nutritionalEmail, setNutritionalEmail] = useState("");
+  const [nutritionalGoal, setNutritionalGoal] = useState("");
+  const [nutritionalPhone, setNutritionalPhone] = useState("");
+
+  // Stati per la selezione della data e dell'orario
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [selectedTime, setSelectedTime] = useState([]); // Array per selezionare più orari
+
+  // Stati per i dettagli di contatto generali del cliente
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [notes, setNotes] = useState("");
+
+  // Stato per la conferma della prenotazione, nasconde il modulo principale dopo la conferma
+  const [confirmed, setConfirmed] = useState(false);
+
+  // Stato per mostrare/nascondere il form di social login (simulato)
+  const [showSocialLoginForm, setShowSocialLoginForm] = useState(false);
+  const [socialLoginEmail, setSocialLoginEmail] = useState("");
+  const [socialLoginPassword, setSocialLoginPassword] = useState("");
+
+  // Stati per il metodo di pagamento
+  const [paymentMethod, setPaymentMethod] = useState(""); // paypal | bonifico | carta_di_credito | scalapay
+  const [cardNumber, setCardNumber] = useState("");
+  const [expiryDate, setExpiryDate] = useState("");
+  const [cvv, setCvv] = useState("");
+
+  // Lista di prenotazioni simulate per mostrare gli slot occupati
+  const [bookings, setBookings] = useState([
+    {
+      date: "2025-04-05",
+      time: "10:00",
+      type: "personal_training",
+      role: "personal_trainer",
+      trainerMode: "one_to_one",
+      people: null,
+      nutritionalProgram: null,
+      nutritionalDetails: null
+    },
+    {
+      date: "2025-04-05",
+      time: "15:00",
+      type: "exclusive",
+      role: "fitness_lover",
+      people: "2",
+      nutritionalProgram: null,
+      nutritionalDetails: null
+    },
+    {
+      date: "2025-04-06",
+      time: "16:00",
+      type: "nutrition",
+      role: "personal_trainer",
+      people: null,
+      nutritionalProgram: "prima_visita",
+      nutritionalDetails: {
+        name: "Mario",
+        surname: "Rossi",
+        age: "30",
+        email: "mario.rossi@example.com",
+        goal: "Perdita peso",
+        phone: "1234567890"
+      }
+    },
+    {
+      date: "2025-04-07",
+      time: "09:00",
+      type: "personal_training",
+      role: "personal_trainer",
+      trainerMode: "exclusive",
+      people: null,
+      nutritionalProgram: null,
+      nutritionalDetails: null
+    }
+  ]);
+
+  // Calcola il prezzo della sessione basandosi sulle selezioni dell'utente
+  const calculatePrice = () => {
+    let basePrice = 0;
+    if (role === "fitness_lover") {
+      if (type === "exclusive") basePrice = parseInt(people) * 5 + 10;
+      if (type === "nutrition") {
+        if (nutritionalProgram === "prima_visita") basePrice = 90;
+        if (nutritionalProgram === "controllo") basePrice = 40;
+        if (nutritionalProgram === "prima_visita_scheda") basePrice = 110;
+      }
+    } else if (role === "personal_trainer") {
+      if (type === "personal_training") {
+        if (trainerMode === "one_to_one") basePrice = 15;
+        if (trainerMode === "small_group") basePrice = 20;
+        if (trainerMode === "exclusive") basePrice = 30;
+      }
+      if (type === "nutrition") {
+        if (nutritionalProgram === "prima_visita") basePrice = 90;
+        if (nutritionalProgram === "controllo") basePrice = 40;
+        if (nutritionalProgram === "prima_visita_scheda") basePrice = 110;
+      }
+    }
+    // Per le sessioni di nutrizione, il prezzo non dipende dagli slot orari
+    return (type === "nutrition") ? basePrice : basePrice * selectedTime.length;
+  };
+
+  const totalPrice = calculatePrice();
+
+  // Stati per la gestione del calendario
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  // Calcola i giorni nel mese corrente
+  const daysInMonth = new Date(
+    currentMonth.getFullYear(),
+    currentMonth.getMonth() + 1,
+    0
+  ).getDate();
+  // Calcola il giorno della settimana del primo giorno del mese (0=Domenica, 1=Lunedì, ecc.)
+  const firstDayOfMonth = new Date(
+    currentMonth.getFullYear(),
+    currentMonth.getMonth(),
+    1
+  ).getDay();
+
+  // Funzioni per navigare tra i mesi del calendario
+  const prevMonth = () =>
+    setCurrentMonth(
+      new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1)
+    );
+  const nextMonth = () =>
+    setCurrentMonth(
+      new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1)
+    );
+
+  // Genera gli slot orari disponibili (dalle 5:00 alle 23:00)
+  const generateTimeSlots = () => {
+    const times = [];
+    for (let h = 5; h <= 23; h++) {
+      const hour = String(h).padStart(2, "0");
+      times.push(`${hour}:00`);
+    }
+    return times;
+  };
+
+  const availableTimes = generateTimeSlots();
+
+  // Funzione per ottenere i dettagli di occupazione di uno slot orario specifico
+  const getSlotOccupancyDetails = (time) => {
+    const bookingsForThisSlot = bookings.filter(b => b.time === time && b.date === selectedDate);
+
+    // Cerca prenotazioni di tipo Fitness Lover - Exclusive
+    const flExclusiveBooking = bookingsForThisSlot.find(b => b.role === "fitness_lover" && b.type === "exclusive");
+    // Cerca prenotazioni di tipo Personal Trainer - Personal Training (modalità Exclusive)
+    const ptExclusiveModeBooking = bookingsForThisSlot.find(b => b.role === "personal_trainer" && b.type === "personal_training" && b.trainerMode === "exclusive");
+    // Cerca altre prenotazioni di Personal Trainer (One to One o Small Group) o nutrizione
+    const ptOtherBooking = bookingsForThisSlot.find(b => b.role === "personal_trainer" && ((b.type === "personal_training" && (b.trainerMode === "one_to_one" || b.trainerMode === "small_group")) || b.type === "nutrition"));
+
+    return {
+      flExclusive: flExclusiveBooking,
+      ptExclusiveMode: ptExclusiveModeBooking,
+      ptOther: ptOtherBooking
+    };
+  };
+
+  // Renderizza i giorni del mese nel calendario
+  const renderDays = () => {
+    const dayNames = ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"];
+    const days = [];
+
+    // Aggiungi i nomi dei giorni della settimana all'inizio del calendario
+    dayNames.forEach((day) => {
+      days.push(
+        <div key={day} className="text-center font-medium text-gray-500 py-2">
+          {day}
+        </div>
+      );
+    });
+
+    // Aggiungi div vuoti per allineare correttamente il primo giorno del mese
+    for (let i = 0; i < firstDayOfMonth; i++) {
+      days.push(<div key={`empty-${i}`} className="py-2"></div>);
+    }
+
+    // Aggiungi i bottoni per ogni giorno del mese
+    for (let d = 1; d <= daysInMonth; d++) {
+      // Formatta la data per confrontarla con selectedDate
+      const dateStr = `${currentMonth.getFullYear()}-${String(
+        currentMonth.getMonth() + 1
+      ).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+      const isSelected = selectedDate === dateStr;
+
+      days.push(
+        <button
+          key={d}
+          onClick={() => {
+            setSelectedDate(dateStr);
+            setSelectedTime([]); // Resetta gli orari selezionati quando cambia la data
+          }}
+          className={`w-full py-2 rounded-md transition-all ${
+            isSelected
+              ? "bg-red-600 text-white"
+              : "hover:bg-gray-100 text-gray-700"
+          }`}
+        >
+          {d}
+        </button>
+      );
+    }
+
+    return days;
+  };
+
+  // Gestione della selezione multipla degli orari
+  const handleTimeClick = (time) => {
+    const slotOccupancy = getSlotOccupancyDetails(time);
+    // Impedisce la selezione se lo slot è già occupato da una prenotazione PT Exclusive
+    if (slotOccupancy.ptExclusiveMode) {
+      return;
+    }
+
+    setSelectedTime(prevSelectedTimes => {
+      if (prevSelectedTimes.includes(time)) {
+        // Se l'orario è già selezionato, lo rimuovi
+        return prevSelectedTimes.filter(t => t !== time);
+      } else {
+        // Se l'orario non è selezionato, lo aggiungi
+        return [...prevSelectedTimes, time].sort(); // Ordina per mantenere una visualizzazione coerente
+      }
+    });
+  };
+
+  // Funzione per gestire l'invio del modulo di prenotazione
+  const handleSubmit = (e) => {
+    e.preventDefault(); // Evita il ricaricamento della pagina
+
+    let bookingsToCreate = [];
+    let isValid = true;
+    let errorMessage = '';
+
+    // Validazione dei campi generali di contatto e del metodo di pagamento
+    if (!name || !email || !phone) {
+        errorMessage = 'Completa tutti i campi obbligatori del contatto (Nome e Cognome, Email, Telefono).';
+        isValid = false;
+    } else if (!paymentMethod) {
+        errorMessage = 'Seleziona una modalità di pagamento.';
+        isValid = false;
+    } else if (paymentMethod === "carta_di_credito" && (!cardNumber || !expiryDate || !cvv)) {
+        errorMessage = 'Completa tutti i campi della carta di credito.';
+        isValid = false;
+    }
+
+    // Validazione specifica per il tipo di sessione "Consulenza Nutrizionale"
+    if (isValid && type === "nutrition") {
+      if (!nutritionalProgram) {
+        errorMessage = 'Seleziona un programma nutrizionale.';
+        isValid = false;
+      } else if (!nutritionalName || !nutritionalSurname || !nutritionalAge || !nutritionalEmail || !nutritionalGoal || !nutritionalPhone) {
+        errorMessage = 'Completa tutti i campi del modulo nutrizionale (nome, cognome, età, email, obiettivo, telefono).';
+        isValid = false;
+      } else {
+        // Crea una singola prenotazione per la consulenza nutrizionale
+        bookingsToCreate.push({
+          date: null, time: null, type, role, people: null, trainerMode: null, nutritionalProgram,
+          nutritionalDetails: { name: nutritionalName, surname: nutritionalSurname, age: nutritionalAge, email: nutritionalEmail, goal: nutritionalGoal, phone: nutritionalPhone },
+          name, email, phone, notes, paymentMethod
+        });
+      }
+    } else if (isValid) { // Se non è nutrizione (Fitness Lover Exclusive o Personal Trainer)
+      if (!selectedDate || selectedTime.length === 0) {
+        errorMessage = 'Completa tutti i campi obbligatori (data, almeno un orario).';
+        isValid = false;
+      } else if (role === "fitness_lover" && type === "exclusive" && !people) {
+        errorMessage = 'Seleziona il numero di partecipanti per la sessione Exclusive.';
+        isValid = false;
+      } else if (role === "personal_trainer" && type === "personal_training" && !trainerMode) {
+        errorMessage = 'Seleziona la modalità per Personal Training (One to One, Small Group o Exclusive).';
+        isValid = false;
+      } else {
+        // Crea una prenotazione per ogni slot orario selezionato
+        bookingsToCreate = selectedTime.map(time => ({
+          date: selectedDate, time: time, type, role,
+          people: (type === "exclusive" && role === "fitness_lover") ? people : null,
+          trainerMode: (type === "personal_training" && role === "personal_trainer") ? trainerMode : null,
+          nutritionalProgram: null, nutritionalDetails: null, name, email, phone, notes, paymentMethod
+        }));
+      }
+    }
+
+    // Se la validazione fallisce, mostra il messaggio di errore
+    if (!isValid) {
+      setConfirmationMessage({ show: true, type: 'error', message: errorMessage });
+      return;
+    }
+
+    // Aggiorna lo stato delle prenotazioni e conferma
+    setBookings(prev => [...prev, ...bookingsToCreate]);
+    setConfirmed(true); // Imposta confirmed a true per nascondere il contenuto principale del modulo
+    setConfirmationMessage({ show: true, type: 'success', message: 'Prenotazione confermata!' });
+  };
+
+  // Funzione simulata per il social login
+  const handleSocialLoginSubmit = (e) => {
+    e.preventDefault();
+    if (socialLoginEmail && socialLoginPassword) {
+      setConfirmationMessage({ show: true, type: 'success', message: `Accesso simulato con: ${socialLoginEmail}` });
+      setShowSocialLoginForm(false); // Nasconde il form dopo il "login"
+      setSocialLoginEmail(''); // Pulisce i campi
+      setSocialLoginPassword('');
+    } else {
+      setConfirmationMessage({ show: true, type: 'error', message: 'Inserisci email e password per l\'accesso.' });
+    }
+  };
+
+  // Stato per il messaggio di conferma personalizzato (modal)
+  const [confirmationMessage, setConfirmationMessage] = useState({ show: false, type: '', message: '' });
+
+  // Condizione per mostrare il modulo di prenotazione finale
+  const showFinalBookingForm =
+    (type === "nutrition" && nutritionalProgram && nutritionalName && nutritionalSurname && nutritionalAge && nutritionalEmail && nutritionalGoal && nutritionalPhone) ||
+    (type !== "nutrition" && type !== "" && selectedTime.length > 0 && selectedDate);
+
+
+  return (
+    <div className="min-h-screen bg-white text-gray-800 font-sans">
+      {/* Header */}
+      <header className="bg-red-600 text-white shadow-lg rounded-b-lg">
+        <div className="max-w-7xl mx-auto px-6 py-6 text-center">
+          <h1 className="text-3xl md:text-4xl font-bold">NutriFit</h1>
+          <p className="text-xl md:text-2xl mt-2 font-bold text-white">
+            Smart Gym for Fitness &amp; Nutrition
+          </p>
+        </div>
+      </header>
+
+      {/* Main Content Area - Nascosto se una prenotazione nutrizionale è stata confermata */}
+      {!confirmed || (confirmed && type !== "nutrition") ? (
+        <>
+          {/* Sezione Hero */}
+          <section className="bg-white py-12">
+            <div className="max-w-4xl mx-auto px-6 text-center">
+              <h2 className="text-3xl md:text-4xl font-bold mb-4 text-red-600">Prenota la tua sessione personalizzata</h2>
+              <p className="text-lg mb-6 text-gray-600">
+                Scegli tra le nostre opzioni di prenotazione e inizia oggi stesso il tuo percorso fitness o nutrizionale.
+              </p>
+            </div>
+          </section>
+
+          {/* Selezione Ruolo */}
+          <section className="py-6 bg-gray-50 rounded-lg mx-auto max-w-7xl px-6 my-4">
+            <div className="max-w-4xl mx-auto space-y-6">
+              <h3 className="text-xl font-semibold text-center">Seleziona il tuo ruolo</h3>
+              <div className="flex justify-center gap-4 flex-wrap">
+                <button
+                  onClick={() => {
+                    // Resetta tutti gli stati quando si cambia ruolo
+                    setRole("fitness_lover");
+                    setType("");
+                    setPeople("");
+                    setTrainerMode("");
+                    setNutritionalProgram("");
+                    setNutritionalName("");
+                    setNutritionalSurname("");
+                    setNutritionalAge("");
+                    setNutritionalEmail("");
+                    setNutritionalGoal("");
+                    setNutritionalPhone("");
+                    setSelectedDate(null);
+                    setSelectedTime([]);
+                    setConfirmed(false);
+                    setConfirmationMessage({ show: false, type: '', message: '' });
+                    setShowSocialLoginForm(false);
+                    setPaymentMethod("");
+                    setCardNumber(""); setExpiryDate(""); setCvv("");
+                  }}
+                  className={`px-6 py-3 flex items-center gap-2 rounded-full font-medium transition-all transform hover:scale-105 shadow-md ${
+                    role === "fitness_lover"
+                      ? "bg-red-600 text-white"
+                      : "bg-white text-red-600 border border-red-300 hover:bg-red-50"
+                  }`}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z" />
+                    <path d="M12 6c-3.31 0-6 2.69-6 6 0 3.31 6 10 6 10s6-6.69 6-10c0-3.31-2.69-6-6-6z" />
+                  </svg>
+                  Fitness Lover
+                </button>
+                <button
+                  onClick={() => {
+                    // Resetta tutti gli stati quando si cambia ruolo
+                    setRole("personal_trainer");
+                    setType("");
+                    setPeople("");
+                    setTrainerMode("");
+                    setNutritionalProgram("");
+                    setNutritionalName("");
+                    setNutritionalSurname("");
+                    setNutritionalAge("");
+                    setNutritionalEmail("");
+                    setNutritionalGoal("");
+                    setNutritionalPhone("");
+                    setSelectedDate(null);
+                    setSelectedTime([]);
+                    setConfirmed(false);
+                    setConfirmationMessage({ show: false, type: '', message: '' });
+                    setShowSocialLoginForm(false);
+                    setPaymentMethod("");
+                    setCardNumber(""); setExpiryDate(""); setCvv("");
+                  }}
+                  className={`px-6 py-3 flex items-center gap-2 rounded-full font-medium transition-all transform hover:scale-105 shadow-md ${
+                    role === "personal_trainer"
+                      ? "bg-red-600 text-white"
+                      : "bg-white text-red-600 border border-red-300 hover:bg-red-50"
+                  }`}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <circle cx="12" cy="8" r="4" />
+                    <path d="M6 20c0-3.31 4.5-8 6-8s6 4.69 6 8H6z" />
+                  </svg>
+                  Personal Trainer
+                </button>
+              </div>
+            </div>
+          </section>
+
+          {/* Tipo di Sessione + tendine dinamiche */}
+          <section className="py-6 bg-gray-50 rounded-lg mx-auto max-w-7xl px-6 my-4">
+            <div className="max-w-4xl mx-auto space-y-6">
+              <h3 className="text-xl font-semibold text-center">Tipo di sessione</h3>
+              <div className="flex justify-center gap-4 flex-wrap">
+                {role === "fitness_lover" && (
+                  <>
+                    <button
+                      onClick={() => {
+                        // Resetta gli stati specifici quando si cambia tipo di sessione
+                        setType("exclusive");
+                        setPeople("");
+                        setTrainerMode("");
+                        setNutritionalProgram("");
+                        setNutritionalName("");
+                        setNutritionalSurname("");
+                        setNutritionalAge("");
+                        setNutritionalEmail("");
+                        setNutritionalGoal("");
+                        setNutritionalPhone("");
+                        setSelectedDate(null);
+                        setSelectedTime([]);
+                        setConfirmed(false);
+                        setConfirmationMessage({ show: false, type: '', message: '' });
+                        setShowSocialLoginForm(false);
+                        setPaymentMethod("");
+                        setCardNumber(""); setExpiryDate(""); setCvv("");
+                      }}
+                      className={`py-3 px-4 rounded-md font-medium transition-colors transform hover:scale-105 shadow-md ${
+                        type === "exclusive"
+                          ? "bg-red-600 text-white"
+                          : "bg-white text-red-600 border border-red-300 hover:bg-red-50"
+                      }`}
+                    >
+                      Exclusive
+                    </button>
+                    <button
+                      onClick={() => {
+                        // Resetta gli stati specifici quando si cambia tipo di sessione
+                        setType("nutrition");
+                        setPeople("1"); // Per nutrizione, il numero di persone è fisso a 1
+                        setTrainerMode("");
+                        setNutritionalProgram("");
+                        setNutritionalName("");
+                        setNutritionalSurname("");
+                        setNutritionalAge("");
+                        setNutritionalEmail("");
+                        setNutritionalGoal("");
+                        setNutritionalPhone("");
+                        setSelectedDate(null); // Data non rilevante per nutrizione
+                        setSelectedTime([]); // Orari non rilevanti per nutrizione
+                        setConfirmed(false);
+                        setConfirmationMessage({ show: false, type: '', message: '' });
+                        setShowSocialLoginForm(false);
+                        setPaymentMethod("");
+                        setCardNumber(""); setExpiryDate(""); setCvv("");
+                      }}
+                      className={`py-3 px-4 rounded-md font-medium transition-colors transform hover:scale-105 shadow-md ${
+                        type === "nutrition"
+                          ? "bg-red-600 text-white"
+                          : "bg-white text-red-600 border border-red-300 hover:bg-red-50"
+                      }`}
+                    >
+                      Consulenza Nutrizionale Online
+                    </button>
+                  </>
+                )}
+
+                {role === "personal_trainer" && (
+                  <>
+                    <button
+                      onClick={() => {
+                        // Resetta gli stati specifici quando si cambia tipo di sessione
+                        setType("personal_training");
+                        setPeople(null);
+                        setTrainerMode("");
+                        setNutritionalProgram("");
+                        setNutritionalName("");
+                        setNutritionalSurname("");
+                        setNutritionalAge("");
+                        setNutritionalEmail("");
+                        setNutritionalGoal("");
+                        setNutritionalPhone("");
+                        setSelectedDate(null);
+                        setSelectedTime([]);
+                        setConfirmed(false);
+                        setConfirmationMessage({ show: false, type: '', message: '' });
+                        setShowSocialLoginForm(false);
+                        setPaymentMethod("");
+                        setCardNumber(""); setExpiryDate(""); setCvv("");
+                      }}
+                      className={`py-3 px-4 rounded-md font-medium transition-colors transform hover:scale-105 shadow-md ${
+                        type === "personal_training"
+                          ? "bg-red-600 text-white"
+                          : "bg-white text-red-600 border border-red-300 hover:bg-red-50"
+                      }`}
+                    >
+                      Personal Training
+                    </button>
+                    <button
+                      onClick={() => {
+                        // Resetta gli stati specifici quando si cambia tipo di sessione
+                        setType("nutrition");
+                        setPeople("1"); // Per nutrizione, il numero di persone è fisso a 1
+                        setTrainerMode("");
+                        setNutritionalProgram("");
+                        setNutritionalName("");
+                        setNutritionalSurname("");
+                        setNutritionalAge("");
+                        setNutritionalEmail("");
+                        setNutritionalGoal("");
+                        setNutritionalPhone("");
+                        setSelectedDate(null);
+                        setSelectedTime([]);
+                        setConfirmed(false);
+                        setConfirmationMessage({ show: false, type: '', message: '' });
+                        setShowSocialLoginForm(false);
+                        setPaymentMethod("");
+                        setCardNumber(""); setExpiryDate(""); setCvv("");
+                      }}
+                      className={`py-3 px-4 rounded-md font-medium transition-colors transform hover:scale-105 shadow-md ${
+                        type === "nutrition"
+                          ? "bg-red-600 text-white"
+                          : "bg-white text-red-600 border border-red-300 hover:bg-red-50"
+                      }`}
+                    >
+                      Consulenza Nutrizionale Online
+                    </button>
+                  </>
+                )}
+              </div>
+
+              {/* Form dinamico per Fitness Lover (solo per Exclusive) */}
+              {role === "fitness_lover" && type === "exclusive" && (
+                <div className="mt-6 bg-white p-6 rounded-lg shadow max-w-3xl mx-auto">
+                  <label className="block text-sm font-medium text-gray-700 mb-2 text-center">
+                    Numero di partecipanti
+                  </label>
+                  <select
+                    value={people}
+                    onChange={(e) => setPeople(e.target.value)}
+                    required
+                    className="w-full px-4 py-2 border border-red-300 rounded-md focus:outline-none bg-white text-red-600 text-center"
+                  >
+                    <option value="" disabled hidden>Seleziona numero di persone</option>
+                    <option value="1">1 persona (15€)</option>
+                    <option value="2">2 persone (20€)</option>
+                    <option value="3">3 persone (25€)</option>
+                    <option value="4">4 persone (30€)</option>
+                  </select>
+                </div>
+              )}
+
+              {/* Tendina "Modalità" per Personal Trainer quando seleziona "Personal Training" */}
+              {role === "personal_trainer" && type === "personal_training" && (
+                <div className="mt-6 bg-white p-6 rounded-lg shadow max-w-3xl mx-auto">
+                  <label className="block text-sm font-medium text-gray-700 mb-2 text-center">
+                    Modalità
+                  </label>
+                  <select
+                    value={trainerMode}
+                    onChange={(e) => setTrainerMode(e.target.value)}
+                    required
+                    className="w-full px-4 py-2 border border-red-300 rounded-md focus:outline-none bg-white text-red-600 text-center"
+                  >
+                    <option value="" disabled hidden>Seleziona modalità</option>
+                    <option value="one_to_one">One to One (15€)</option>
+                    <option value="small_group">Small Group (20€)</option>
+                    <option value="exclusive">Exclusive (30€)</option>
+                  </select>
+                </div>
+              )}
+
+              {/* Tendina "Programma Nutrizionale" per entrambi i ruoli quando si seleziona "Consulenza Nutrizionale Online" */}
+              {type === "nutrition" && (
+                <div className="mt-6 bg-white p-6 rounded-lg shadow max-w-3xl mx-auto">
+                  <label className="block text-sm font-medium text-gray-700 mb-2 text-center">
+                    Programma Nutrizionale
+                  </label>
+                  <select
+                    value={nutritionalProgram}
+                    onChange={(e) => setNutritionalProgram(e.target.value)}
+                    required
+                    className="w-full px-4 py-2 border border-red-300 rounded-md focus:outline-none bg-white text-red-600 text-center"
+                  >
+                    <option value="" disabled hidden>Seleziona programma</option>
+                    <option value="prima_visita">Prima visita (90€)</option>
+                    <option value="controllo">Controllo (40€)</option>
+                    <option value="prima_visita_scheda">Prima visita con scheda (110€)</option>
+                  </select>
+
+                  {/* Form per dettagli utente nutrizione - visibile solo se è selezionato un programma nutrizionale */}
+                  {nutritionalProgram && (
+                    <div className="mt-6 space-y-4">
+                      <h4 className="block text-sm font-medium text-gray-700 text-center">Dettagli Utente per Consulenza</h4>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="nutritionalName">
+                          Nome *
+                        </label>
+                        <input
+                          id="nutritionalName"
+                          type="text"
+                          value={nutritionalName}
+                          onChange={(e) => setNutritionalName(e.target.value)}
+                          required
+                          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-400"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="nutritionalSurname">
+                          Cognome *
+                        </label>
+                        <input
+                          id="nutritionalSurname"
+                          type="text"
+                          value={nutritionalSurname}
+                          onChange={(e) => setNutritionalSurname(e.target.value)}
+                          required
+                          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-400"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="nutritionalAge">
+                          Età *
+                        </label>
+                        <input
+                          id="nutritionalAge"
+                          type="number"
+                          value={nutritionalAge}
+                          onChange={(e) => setNutritionalAge(e.target.value)}
+                          required
+                          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-400"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="nutritionalEmail">
+                          Email *
+                        </label>
+                        <input
+                          id="nutritionalEmail"
+                          type="email"
+                          value={nutritionalEmail}
+                          onChange={(e) => setNutritionalEmail(e.target.value)}
+                          required
+                          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-400"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="nutritionalPhone">
+                          Telefono *
+                        </label>
+                        <input
+                          id="nutritionalPhone"
+                          type="tel"
+                          value={nutritionalPhone}
+                          onChange={(e) => setNutritionalPhone(e.target.value)}
+                          required
+                          placeholder="Inserisci il tuo telefono"
+                          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-400"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="nutritionalGoal">
+                          Obiettivo *
+                        </label>
+                        <textarea
+                          id="nutritionalGoal"
+                          rows="3"
+                          value={nutritionalGoal}
+                          onChange={(e) => setNutritionalGoal(e.target.value)}
+                          required
+                          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-400"
+                        ></textarea>
+                      </div>
+                      {/* Il bottone 'Invio' per la nutrizione non è più qui, ma nel form finale */}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* Selezione Data e Orario - VISIBILE SOLO SE type NON È "nutrition" */}
+          {(type !== "nutrition" && type !== "") && (
+            <section className="py-12 bg-gray-50 rounded-lg mx-auto max-w-7xl px-6 my-4">
+              <div className="max-w-4xl mx-auto space-y-8">
+                {/* Calendario */}
+                <div>
+                  <h4 className="block text-sm font-medium text-gray-700 mb-2 text-center">Seleziona una data</h4>
+                  <div className="bg-white rounded-lg shadow overflow-hidden max-w-md mx-auto">
+                    <div className="flex items-center justify-between px-4 py-2">
+                      <button
+                        type="button"
+                        onClick={prevMonth}
+                        className="text-gray-600 hover:text-gray-900 px-3 py-1 rounded-md hover:bg-gray-100 transition-colors"
+                      >
+                        ❮
+                      </button>
+                      <div className="text-lg font-semibold">
+                        {currentMonth.toLocaleString("it-IT", {
+                          month: "long",
+                          year: "numeric",
+                        })}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={nextMonth}
+                        className="text-gray-600 hover:text-gray-900 px-3 py-1 rounded-md hover:bg-gray-100 transition-colors"
+                      >
+                        ❯
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-7 gap-1 p-2">
+                      {renderDays()}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Selezione Orario */}
+                <div>
+                  <h4 className="block text-sm font-medium text-gray-700 mb-2 text-center">Seleziona uno o più orari</h4>
+                  <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 gap-2 max-w-6xl mx-auto">
+                    {availableTimes.map((t) => {
+                      const slotOccupancy = getSlotOccupancyDetails(t);
+                      const isSelectedByCurrentUser = selectedTime.includes(t);
+
+                      let buttonClass = `py-2 px-1 text-center rounded-md text-sm font-medium transition-colors`;
+                      let displayText = t;
+                      let showCrossIcon = false;
+                      let isDisabled = false;
+
+                      // Priorità: La prenotazione in modalità PT Exclusive blocca lo slot
+                      if (slotOccupancy.ptExclusiveMode) {
+                        buttonClass = `py-2 px-1 text-center rounded-md text-sm font-medium transition-colors bg-red-600 text-white relative overflow-hidden diagonal-red-stripe`;
+                        displayText = `${t} (PT Esclusivo)`;
+                        showCrossIcon = true;
+                        isDisabled = true;
+                      }
+                      // Caso 2: Lo slot è selezionato dall'utente corrente
+                      else if (isSelectedByCurrentUser) {
+                        buttonClass += ` bg-red-600 text-white`; // Sempre rosso se selezionato dall'utente corrente
+                        if (slotOccupancy.flExclusive) {
+                          // Se lo slot selezionato ha anche una prenotazione FL
+                          displayText = `${t} (${slotOccupancy.flExclusive.people} pers.)`;
+                          // Se l'utente corrente è un PT e sta selezionando lo slot di un FL
+                          if (role === "personal_trainer") {
+                            displayText += ` + P.T.`;
+                            showCrossIcon = true;
+                          }
+                        } else if (slotOccupancy.ptOther) {
+                          // Se lo slot selezionato ha anche un'altra prenotazione PT (non exclusive)
+                          displayText = `${t} (P.T. prenotato)`;
+                        }
+                        // Se selezionato dall'utente corrente e nessuna prenotazione preesistente, solo 't'
+                      }
+                      // Caso 3: Lo slot NON è selezionato dall'utente corrente, ma ha prenotazioni preesistenti
+                      else if (slotOccupancy.flExclusive || slotOccupancy.ptOther) {
+                        buttonClass += ` bg-red-100 text-red-700 opacity-70`; // Prenotazione preesistente, rosso più chiaro
+                        if (slotOccupancy.flExclusive && slotOccupancy.ptOther) {
+                          // Prenotato sia da FL che da PT (non exclusive)
+                          displayText = `${t} (${slotOccupancy.flExclusive.people} pers.) + P.T.`;
+                          showCrossIcon = true;
+                        } else if (slotOccupancy.flExclusive) {
+                          // Prenotato solo da FL
+                          displayText = `${t} (${slotOccupancy.flExclusive.people} pers.)`;
+                          if (role === "personal_trainer") {
+                            // Se l'utente corrente è un PT e questo è uno slot solo FL, è comunque "prenotabile in contemporanea"
+                            showCrossIcon = true;
+                          }
+                        } else if (slotOccupancy.ptOther) {
+                          // Prenotato solo da un altro PT (non exclusive)
+                          displayText = `${t} (P.T. prenotato)`;
+                        }
+                      }
+                      // Caso 4: Lo slot è completamente libero
+                      else {
+                        buttonClass += ` bg-green-100 text-green-700 hover:bg-green-200`; // Slot libero
+                      }
+
+                      return (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => handleTimeClick(t)}
+                          className={buttonClass}
+                          disabled={isDisabled}
+                        >
+                          {displayText}
+                          {showCrossIcon && (
+                            <span className="ml-1">✗</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* Form di Prenotazione Finale (Contatto e Pagamento) - VISIBILE QUANDO I PREREQUISITI SONO SODDISFATTI */}
+          {showFinalBookingForm && (
+            <section className="py-12 bg-white rounded-lg mx-auto max-w-7xl px-6 my-4">
+              <div className="max-w-4xl mx-auto">
+                <h3 className="text-2xl font-bold text-center mb-6 text-red-600">Completa la tua prenotazione e scegli il pagamento</h3>
+                <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow-md mx-auto max-w-md space-y-4">
+                  {/* Campi contatto generali */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="name">
+                      Nome e Cognome *
+                    </label>
+                    <input
+                      id="name"
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      required
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="phone">
+                      Telefono *
+                    </label>
+                    <input
+                      id="phone"
+                      type="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      required
+                      placeholder="Inserisci il tuo telefono"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="email">
+                      Email *
+                    </label>
+                    <input
+                      id="email"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="notes">
+                      Note (opzionali)
+                    </label>
+                    <textarea
+                      rows="3"
+                      id="notes"
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      placeholder="Eventuali esigenze particolari..."
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-400"
+                    ></textarea>
+                  </div>
+
+                  {/* Sezione di Login (simulato) - Spostata qui */}
+                  {role === "fitness_lover" && (
+                    <div className="mt-6 space-y-4 text-center">
+                      <h4 className="text-lg font-semibold text-gray-800">Accedi o Registrati</h4>
+                      <div className="flex justify-center gap-4 flex-wrap">
+                        <button
+                          type="button" // Important: use type="button" to prevent form submission
+                          onClick={() => {
+                            // Simula accesso con Google
+                            setConfirmationMessage({ show: true, type: 'success', message: 'Accesso simulato con Google.' });
+                          }}
+                          className="px-6 py-3 flex items-center gap-2 rounded-full font-medium transition-all transform hover:scale-105 shadow-md bg-white text-gray-700 border border-gray-300 hover:bg-gray-100"
+                        >
+                          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12.24 10.27v-2.31h3.33c-.09-.59-.72-2.14-3.33-2.14-2.65 0-4.81 2.16-4.81 4.81s2.16 4.81 4.81 4.81c1.47 0 2.45-.62 2.99-1.15l1.97 1.95c-1.37 1.34-3.13 2.05-4.96 2.05-4.14 0-7.5-3.36-7.5-7.5s3.36-7.5 7.5-7.5c4.07 0 7.21 2.92 7.21 7.25 0 .48-.04.88-.1 1.27h-7.11z" />
+                          </svg>
+                          Accedi con Google
+                        </button>
+                        <button
+                          type="button" // Important: use type="button" to prevent form submission
+                          onClick={() => {
+                            // Simula accesso con Facebook
+                            setConfirmationMessage({ show: true, type: 'success', message: 'Accesso simulato con Facebook.' });
+                          }}
+                          className="px-6 py-3 flex items-center gap-2 rounded-full font-medium transition-all transform hover:scale-105 shadow-md bg-blue-600 text-white hover:bg-blue-700"
+                        >
+                          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M14.07 10.31L13.88 12h-2.11v8h-3.41v-8h-1.92V10.31h1.92V8.92c0-1.89 1.15-2.92 2.85-2.92h2.24v2.02h-1.32c-.93 0-1.12.39-1.12 1.09v1.2z" />
+                          </svg>
+                          Accedi con Facebook
+                        </button>
+                      </div>
+
+                      <button
+                        type="button" // Important: use type="button" to prevent form submission
+                        onClick={() => setShowSocialLoginForm(!showSocialLoginForm)}
+                        className="text-red-600 hover:underline font-medium mt-4"
+                      >
+                        {showSocialLoginForm ? "Nascondi il modulo di accesso con Email" : "Oppure accedi con la tua Email"}
+                      </button>
+
+                      {showSocialLoginForm && (
+                        <div className="mt-6 bg-white p-6 rounded-lg shadow max-w-sm mx-auto space-y-4">
+                          <h4 className="text-lg font-semibold text-gray-800">Accedi con Email</h4>
+                          <form onSubmit={handleSocialLoginSubmit} className="space-y-4">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="socialEmail">
+                                Email
+                              </label>
+                              <input
+                                id="socialEmail"
+                                type="email"
+                                value={socialLoginEmail}
+                                onChange={(e) => setSocialLoginEmail(e.target.value)}
+                                required
+                                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-400"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="socialPassword">
+                                Password
+                              </label>
+                              <input
+                                id="socialPassword"
+                                type="password"
+                                value={socialLoginPassword}
+                                onChange={(e) => setSocialLoginPassword(e.target.value)}
+                                required
+                                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-400"
+                              />
+                            </div>
+                            <button
+                              type="submit"
+                              className="w-full bg-red-600 text-white py-2 px-4 rounded-md font-medium hover:bg-red-700 transition-colors"
+                            >
+                              Login
+                            </button>
+                          </form>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Modalità di Pagamento */}
+                  <div className="mt-4 space-y-3">
+                    <h4 className="block text-sm font-medium text-gray-700 text-center">Modalità di Pagamento *</h4>
+                    <div className="flex flex-col gap-2">
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name="paymentMethod"
+                          value="paypal"
+                          checked={paymentMethod === "paypal"}
+                          onChange={(e) => {setPaymentMethod(e.target.value); setCardNumber(""); setExpiryDate(""); setCvv("");}}
+                          className="form-radio text-red-600"
+                        />
+                        <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor" style={{color: '#003087'}}>
+                          <path d="M7.4 20.3H4.4C3.6 20.3 3 19.7 3 18.9V5.1C3 4.3 3.6 3.7 4.4 3.7H7.4C8.2 3.7 8.8 4.3 8.8 5.1V18.9C8.8 19.7 8.2 20.3 7.4 20.3ZM12.2 20.3H9.2C8.4 20.3 7.8 19.7 7.8 18.9V5.1C7.8 4.3 8.4 3.7 9.2 3.7H12.2C13 3.7 13.6 4.3 13.6 5.1V18.9C13.6 19.7 13 20.3 12.2 20.3ZM17 20.3H14C13.2 20.3 12.6 19.7 12.6 18.9V5.1C12.6 4.3 13.2 3.7 14 3.7H17C17.8 3.7 18.4 4.3 18.4 5.1V18.9C18.4 19.7 17.8 20.3 17 20.3ZM21.8 20.3H18.8C18 20.3 17.4 19.7 17.4 18.9V5.1C17.4 4.3 18 3.7 18.8 3.7H21.8C22.6 3.7 23.2 4.3 23.2 5.1V18.9C23.2 19.7 22.6 20.3 21.8 20.3Z"/>
+                        </svg>
+                        PayPal
+                      </label>
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name="paymentMethod"
+                          value="bonifico"
+                          checked={paymentMethod === "bonifico"}
+                          onChange={(e) => {setPaymentMethod(e.target.value); setCardNumber(""); setExpiryDate(""); setCvv("");}}
+                          className="form-radio text-red-600"
+                        />
+                        <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor" style={{color: '#28a745'}}>
+                          <path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4V8h16v10zm-12-8H4v2h8V8z"/>
+                        </svg>
+                        Bonifico Bancario
+                      </label>
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name="paymentMethod"
+                          value="carta_di_credito"
+                          checked={paymentMethod === "carta_di_credito"}
+                          onChange={(e) => setPaymentMethod(e.target.value)}
+                          className="form-radio text-red-600"
+                        />
+                        <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor" style={{color: '#ff5f00'}}>
+                          <path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4V8h16v10zm-12-8H4v2h8V8z"/>
+                        </svg>
+                        Carta di Credito
+                      </label>
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name="paymentMethod"
+                          value="scalapay"
+                          checked={paymentMethod === "scalapay"}
+                          onChange={(e) => {setPaymentMethod(e.target.value); setCardNumber(""); setExpiryDate(""); setCvv("");}}
+                          className="form-radio text-red-600"
+                        />
+                        <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor" style={{color: '#8c24ef'}}>
+                          <path d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zM12 6c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm0 10c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z"/>
+                        </svg>
+                        Scalapay
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Campi Carta di Credito (visibili solo se selezionato "Carta di Credito") */}
+                  {paymentMethod === "carta_di_credito" && (
+                    <div className="mt-4 space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="cardNumber">
+                          Numero Carta *
+                        </label>
+                        <input
+                          id="cardNumber"
+                          type="text"
+                          value={cardNumber}
+                          onChange={(e) => setCardNumber(e.target.value)}
+                          required
+                          placeholder="XXXX XXXX XXXX XXXX"
+                          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-400"
+                        />
+                      </div>
+                      <div className="flex gap-4">
+                        <div className="w-1/2">
+                          <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="expiryDate">
+                            Data Scadenza *
+                          </label>
+                          <input
+                            id="expiryDate"
+                            type="text"
+                            value={expiryDate}
+                            onChange={(e) => setExpiryDate(e.target.value)}
+                            required
+                            placeholder="MM/YY"
+                            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-400"
+                          />
+                        </div>
+                        <div className="w-1/2">
+                          <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="cvv">
+                            CVV *
+                          </label>
+                          <input
+                            id="cvv"
+                            type="text"
+                            value={cvv}
+                            onChange={(e) => setCvv(e.target.value)}
+                            required
+                            placeholder="XXX"
+                            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-400"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Prezzo Totale */}
+                  {totalPrice > 0 && (
+                    <div className="mt-6 text-center text-xl font-bold text-gray-900">
+                      Prezzo totale: {totalPrice.toFixed(2)}€
+                    </div>
+                  )}
+
+                  {/* Bottone di Invio */}
+                  <div className="mt-8 text-center">
+                    <button
+                      type="submit"
+                      className="w-full bg-red-600 text-white py-3 px-6 rounded-full font-semibold text-lg hover:bg-red-700 transition-colors shadow-lg transform hover:scale-105"
+                    >
+                      Conferma Prenotazione
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </section>
+          )}
+
+          {/* Sezione per visualizzare le prenotazioni esistenti (a scopo di debug/visualizzazione) */}
+          <section className="py-6 bg-gray-100 rounded-lg mx-auto max-w-7xl px-6 my-4">
+            <h3 className="text-xl font-semibold text-center mb-4 text-gray-700">Prenotazioni Esistenti</h3>
+            <div className="max-h-60 overflow-y-auto bg-white p-4 rounded-lg shadow">
+              {bookings.length > 0 ? (
+                <ul className="space-y-2">
+                  {bookings.map((booking, index) => (
+                    <li key={index} className="bg-gray-50 p-3 rounded-md text-sm text-gray-600 border border-gray-200">
+                      <strong>Data:</strong> {booking.date || "N/A"}, <strong>Orario:</strong> {booking.time || "N/A"},{" "}
+                      <strong>Tipo:</strong> {booking.type},{" "}
+                      <strong>Ruolo:</strong> {booking.role}
+                      {booking.people && `, Persone: ${booking.people}`}
+                      {booking.trainerMode && `, Modalità PT: ${booking.trainerMode}`}
+                      {booking.nutritionalProgram && `, Programma Nutrizionale: ${booking.nutritionalProgram}`}
+                      {booking.nutritionalDetails && (
+                        <>
+                          <br />
+                          <span className="font-semibold">Dettagli Nutr.:</span> {booking.nutritionalDetails.name} {booking.nutritionalDetails.surname} ({booking.nutritionalDetails.age}), {booking.nutritionalDetails.email}, Obiettivo: {booking.nutritionalDetails.goal}
+                        </>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-center text-gray-500">Nessuna prenotazione esistente.</p>
+              )}
+            </div>
+          </section>
+        </>
+      ) : (
+        // Messaggio di conferma dopo la prenotazione di consulenza nutrizionale
+        <div className="min-h-screen flex items-center justify-center bg-gray-100 p-6">
+          <div className="bg-white p-8 rounded-lg shadow-xl text-center max-w-md mx-auto">
+            <h2 className="text-3xl font-bold text-red-600 mb-4">Prenotazione Confermata!</h2>
+            <p className="text-lg text-gray-700 mb-6">
+              Grazie per aver prenotato la tua consulenza nutrizionale online. Verrai contattato a breve per i dettagli.
+            </p>
+            <button
+              onClick={() => {
+                setConfirmed(false); // Resetta lo stato per permettere nuove prenotazioni
+                setRole("fitness_lover");
+                setType("");
+                setPeople("");
+                setTrainerMode("");
+                setNutritionalProgram("");
+                setNutritionalName("");
+                setNutritionalSurname("");
+                setNutritionalAge("");
+                setNutritionalEmail("");
+                setNutritionalGoal("");
+                setNutritionalPhone("");
+                setSelectedDate(null);
+                setSelectedTime([]);
+                setName("");
+                setEmail("");
+                setPhone("");
+                setNotes("");
+                setPaymentMethod("");
+                setCardNumber(""); setExpiryDate(""); setCvv("");
+                setConfirmationMessage({ show: false, type: '', message: '' });
+              }}
+              className="bg-red-600 text-white py-2 px-6 rounded-full font-semibold hover:bg-red-700 transition-colors"
+            >
+              Effettua una nuova prenotazione
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modale di conferma personalizzato */}
+      {confirmationMessage.show && (
+        <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg p-6 shadow-xl max-w-sm w-full text-center">
+            <h3 className={`text-2xl font-bold mb-3 ${confirmationMessage.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+              {confirmationMessage.type === 'success' ? 'Successo!' : 'Errore!'}
+            </h3>
+            <p className="text-gray-700 mb-6">{confirmationMessage.message}</p>
+            <button
+              onClick={() => setConfirmationMessage({ show: false, type: '', message: '' })}
+              className={`py-2 px-6 rounded-full font-semibold transition-colors ${
+                confirmationMessage.type === 'success' ? 'bg-green-500 hover:bg-green-600 text-white' : 'bg-red-500 hover:bg-red-600 text-white'
+              }`}
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Footer con contatti */}
+      <footer className="bg-red-600 text-white py-6 mt-12 rounded-t-lg">
+        <div className="max-w-7xl mx-auto px-6 text-center text-sm md:text-base">
+          <p className="font-semibold mb-2">Contatti NutriFit:</p>
+          <p>Email: info@nutrifit.com</p>
+          <p>Telefono: +39 0123 456789</p>
+          <p>Indirizzo: Via Roma 10, 00100 Roma RM</p>
+        </div>
+      </footer>
+    </div>
+  );
+}
